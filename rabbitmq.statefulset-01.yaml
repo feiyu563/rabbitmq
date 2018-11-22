@@ -1,0 +1,119 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-management01
+  namespace: middleware
+  labels:
+    app: rabbitmq01
+spec:
+  ports:
+  - port: 15672
+    name: http
+    nodePort: 32001
+  - port: 5672
+    name: amqp
+    nodePort: 32002
+  selector:
+    app: rabbitmq01
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq01
+  namespace: middleware
+  labels:
+    app: rabbitmq01
+spec:
+  clusterIP: None
+  ports:
+  - port: 5672
+    name: amqp
+  selector:
+    app: rabbitmq01
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: rabbitmq01
+  namespace: middleware
+spec:
+  serviceName: rabbitmq01
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: rabbitmq01
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                    - rabbitmq01
+              topologyKey: "kubernetes.io/hostname"
+      nodeSelector:
+        "rabbitmq1": "true"
+      tolerations:
+        - effect: NoSchedule
+          key: rabbitmq
+          operator: Equal
+          value: exits
+      serviceAccountName: rabbitmq
+      containers:
+      - name: rabbitmq
+        #image: harbor.frognew.com/library/rabbitmq:3.6.11
+        image: harbor.cloudplay.com:5006/k8s/rabbitmq:3.6.2-v4
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "150m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        ports:
+        - containerPort: 5672
+          name: amqp
+        env:
+          - name: RABBITMQ_DEFAULT_USER
+            value: "admin"
+          - name: RABBITMQ_DEFAULT_PASS
+            value: "Yw2017Rabbit"
+          - name: RABBITMQ_ERLANG_COOKIE
+            value: "MHPXDPIFCJKFNPPYZVSK"
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: K8S_SERVICE_NAME
+            value: "rabbitmq01"
+          - name: RABBITMQ_USE_LONGNAME
+            value: "true"
+          - name: RABBITMQ_NODENAME
+            value: "rabbit01@$(MY_POD_NAME).$(K8S_SERVICE_NAME)"
+          - name: RABBITMQ_NODE_TYPE
+            value: disc
+          - name: AUTOCLUSTER_TYPE
+            value: "k8s"
+          - name: AUTOCLUSTER_DELAY
+            value: "10"
+          - name: AUTOCLUSTER_CLEANUP
+            value: "true"
+          - name: CLEANUP_WARN_ONLY
+            value: "false"
+          - name: K8S_ADDRESS_TYPE
+            value: "hostname"
+          - name: K8S_HOSTNAME_SUFFIX
+            value: ".$(K8S_SERVICE_NAME)"
+        volumeMounts:
+        - name: rabbitmq-volume
+          mountPath: /var/lib/rabbitmq
+      volumes:
+        - name: rabbitmq-volume
+          hostPath:
+            path: /data/kubernetes/rabbitmq_server-3.6.2

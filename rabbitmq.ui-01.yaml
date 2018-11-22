@@ -1,0 +1,15 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+ name: rabbitmq01.haimacloud.com
+ namespace: middleware
+ annotations:
+   kubernetes.io/ingress.class: traefik
+spec:
+ rules:
+ - host: rabbitmq01.haimacloud.com
+   http:
+     paths:
+     - backend:
+         serviceName: rabbitmq-management01
+         servicePort: 15672
